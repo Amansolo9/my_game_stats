@@ -6,28 +6,15 @@ class ValorantViewModel extends ChangeNotifier {
 
   bool _isLoading = false;
   String _errorMessage = '';
-  Map<String, dynamic>? _accountDetails;
-  String? _accessToken;
-  String? _refreshToken;
-  Map<String, dynamic>? _userInfo;
-  Map<String, dynamic>? _userStats;
+  Map<String, dynamic>? _accountData;
+  Map<String, dynamic>? _matchData;
+  List<Map<String, dynamic>> _matchDetailsList = [];
 
   bool get isLoading => _isLoading;
   String get errorMessage => _errorMessage;
-  Map<String, dynamic>? get accountDetails => _accountDetails;
-  String? get accessToken => _accessToken;
-  String? get refreshToken => _refreshToken;
-  Map<String, dynamic>? get userInfo => _userInfo;
-  Map<String, dynamic>? get userStats => _userStats;
-
-  Future<void> initiateRSOLogin() async {
-    try {
-      await _apiService.initiateRSOLogin();
-    } catch (e) {
-      // Handle any errors that occur during the login process
-      print('Error during RSO login: $e');
-    }
-  }
+  Map<String, dynamic>? get accountData => _accountData;
+  Map<String, dynamic>? get matchData => _matchData;
+  List<Map<String, dynamic>> get matchDetailsList => _matchDetailsList;
 
   Future<void> fetchAccountDetails(String gameName, String tagLine) async {
     _isLoading = true;
@@ -35,12 +22,12 @@ class ValorantViewModel extends ChangeNotifier {
     notifyListeners();
 
     try {
-      _accountDetails = await _apiService.fetchAccountDetails(
+      _accountData = await _apiService.fetchValorantAccountDetails(
         gameName,
         tagLine,
       );
     } catch (e) {
-      _accountDetails = null;
+      _accountData = null;
       _errorMessage = e.toString();
     } finally {
       _isLoading = false;
@@ -48,55 +35,48 @@ class ValorantViewModel extends ChangeNotifier {
     }
   }
 
-  Future<void> handleAuthorizationCode(String code) async {
-    _isLoading = true;
-    _errorMessage = '';
-    notifyListeners();
-
-    try {
-      final tokens = await _apiService.exchangeCodeForTokens(code);
-      _accessToken = tokens['access_token'];
-      _refreshToken = tokens['refresh_token'];
-      _userInfo = await _apiService.fetchUserInfo(_accessToken!);
-    } catch (e) {
-      _accessToken = null;
-      _refreshToken = null;
-      _userInfo = null;
-      _errorMessage = e.toString();
-    } finally {
-      _isLoading = false;
+  Future<void> fetchMatchHistory() async {
+    // Can only fetch match history if we have account data with PUUID
+    if (_accountData == null || !_accountData!.containsKey('puuid')) {
+      _errorMessage = 'Please fetch player details first to get PUUID';
       notifyListeners();
+      return;
     }
-  }
-
-  Future<void> refreshAccessToken() async {
-    if (_refreshToken == null) return;
 
     _isLoading = true;
     _errorMessage = '';
+    _matchDetailsList = [];
     notifyListeners();
 
     try {
-      final tokens = await _apiService.refreshAccessToken(_refreshToken!);
-      _accessToken = tokens['access_token'];
-      _refreshToken = tokens['refresh_token'];
-    } catch (e) {
-      _errorMessage = e.toString();
-    } finally {
-      _isLoading = false;
-      notifyListeners();
-    }
-  }
+      final puuid = _accountData!['puuid'];
+      _matchData = await _apiService.fetchValorantMatchHistory(puuid);
 
-  Future<void> fetchUserStats() async {
-    _isLoading = true;
-    _errorMessage = '';
-    notifyListeners();
+      // If we get match history, we can also fetch details for each match
+      // But this is optional and may hit rate limits
+      if (_matchData != null && _matchData!.containsKey('history')) {
+        final history = _matchData!['history'] as List;
 
-    try {
-      _userStats = await _apiService.fetchUserStats();
+        // Limit to 3 matches to avoid rate limits
+        final matchesToFetch =
+            history.length > 3 ? history.sublist(0, 3) : history;
+
+        for (var match in matchesToFetch) {
+          try {
+            if (match['matchId'] != null) {
+              final details = await _apiService.fetchValorantMatchDetails(
+                match['matchId'],
+              );
+              _matchDetailsList.add(details);
+            }
+          } catch (e) {
+            // Continue even if one match fails
+            print('Failed to fetch match details: $e');
+          }
+        }
+      }
     } catch (e) {
-      _userStats = null;
+      _matchData = null;
       _errorMessage = e.toString();
     } finally {
       _isLoading = false;
