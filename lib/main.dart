@@ -2,8 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'views/home_screen.dart';
 import 'view_models/home_view_model.dart';
-import 'view_models/valorant_view_model.dart';
-import 'views/valorant_screen.dart';
 import 'views/clash_of_clans_screen.dart';
 import 'views/brawl_stars_screen.dart';
 import 'view_models/brawl_stars_view_model.dart';
@@ -14,7 +12,6 @@ void main() {
     MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (_) => HomeViewModel()),
-        ChangeNotifierProvider(create: (_) => ValorantViewModel()),
         ChangeNotifierProvider(create: (_) => BrawlStarsViewModel()),
         ChangeNotifierProvider(create: (_) => ClashOfClansViewModel()),
       ],
@@ -34,7 +31,6 @@ class MyApp extends StatelessWidget {
       initialRoute: '/',
       routes: {
         '/': (context) => const HomeScreen(),
-        '/Valorant': (context) => const ValorantScreen(),
         '/Clash of Clans': (context) => const ClashOfClansScreen(),
         '/Brawl Stars': (context) => const BrawlStarsScreen(),
       },
